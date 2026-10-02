@@ -9,7 +9,7 @@ const scrypt = promisify(scryptCallback);
 const digest = value => createHash('sha256').update(String(value)).digest('hex');
 const token = () => randomBytes(32).toString('base64url');
 const equal = (a, b) => timingSafeEqual(Buffer.from(digest(a)), Buffer.from(digest(b)));
-const fields = ['upi','cash','staff','rent','egg','fish','chicken','water','gas','vegetables','cooldrinks','chapati','dairy','misc','extra','leaf'];
+const fields = ['upi','cash','staff','rent','egg','fish','chicken','water','generalRation','gas','vegetables','cooldrinks','chapati','dairy','misc','extra','leaf'];
 const problem = (status, message) => Object.assign(new Error(message), { status });
 
 export async function passwordHash(password) {

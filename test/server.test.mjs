@@ -53,15 +53,15 @@ test('owner and staff authentication, shared records, permissions and edit confl
   const el=id=>dom.window.document.getElementById(id);
   await waitFor(()=>!el('sharedApp').hidden);
   el('date').value='2029-03-15';el('date').dispatchEvent(new dom.window.Event('change',{bubbles:true}));
-  for(const [key,value] of [['upi','900'],['water','20.25']]){el(key).value=value;el(key).dispatchEvent(new dom.window.Event('input',{bubbles:true}));}
+  for(const [key,value] of [['upi','900'],['water','20.25'],['generalRation','150.25']]){el(key).value=value;el(key).dispatchEvent(new dom.window.Event('input',{bubbles:true}));}
   el('addCustomExpense').click();const custom=el('customExpenses').firstElementChild;
   custom.querySelector('[data-custom="name"]').value='Soap';custom.querySelector('[data-custom="amount"]').value='10.50';custom.dispatchEvent(new dom.window.Event('input',{bubbles:true}));
   el('saveBtn').click();await waitFor(()=>el('syncMessage').textContent==='Saved for everyone');assert.deepEqual(alerts,[]);
-  const uiRecord=(await request('/api/records','GET',undefined,staff)).body.records['2029-03-15'];assert.equal(uiRecord.water,20.25);assert.equal(uiRecord.customExpenses[0].name,'Soap');assert.equal(uiRecord.customExpenses[0].amount,10.5);
+  const uiRecord=(await request('/api/records','GET',undefined,staff)).body.records['2029-03-15'];assert.equal(uiRecord.water,20.25);assert.equal(uiRecord.generalRation,150.25);assert.equal(el("mExpense").textContent,"₹181");assert.equal(el("mProfit").textContent,"₹719");assert.equal(uiRecord.customExpenses[0].name,'Soap');assert.equal(uiRecord.customExpenses[0].amount,10.5);
   el('monthPicker').value='2028-02';el('monthPicker').dispatchEvent(new dom.window.Event('change'));
   assert.equal(el('ledgerBody').children.length,29);assert.equal(el('monthBadge').textContent,'February 2028');
-  const ledgerInput=el('ledgerBody').querySelector('[data-date="2028-02-29"][data-key="water"]');ledgerInput.value='60';ledgerInput.dispatchEvent(new dom.window.Event('input',{bubbles:true}));
-  await waitFor(async()=>((await request('/api/records','GET',undefined,staff)).body.records['2028-02-29'].water===60));
+  const ledgerInput=el('ledgerBody').querySelector('[data-date="2028-02-29"][data-key="generalRation"]');ledgerInput.value='60';ledgerInput.dispatchEvent(new dom.window.Event('input',{bubbles:true}));
+  await waitFor(async()=>((await request('/api/records','GET',undefined,staff)).body.records['2028-02-29'].generalRation===60));
   const stockInvite=await request('/api/users','POST',{username:'stockkeeper',role:'inventory'},owner);assert.equal(stockInvite.status,201);
   const stockActivation=await request('/api/activate','POST',{token:stockInvite.body.url.split('#')[1],password:'Inventory-test-password-42'});assert.equal(stockActivation.status,200);
   const stockUser={cookie:stockActivation.cookie};stockUser.csrf=(await request('/api/session','GET',undefined,stockUser)).body.csrf;
