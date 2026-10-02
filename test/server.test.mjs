@@ -1,0 +1,80 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { PGlite } from '@electric-sql/pglite';
+import { JSDOM } from 'jsdom';
+import { readFile } from 'node:fs/promises';
+import { createApp, cleanRecord, validDate } from '../server.mjs';
+
+test('owner and staff authentication, shared records, permissions and edit conflicts', async t=>{
+  const database=new PGlite();
+  const db={query:async(sql,params)=>params?database.query(sql,params):(await database.exec(sql)).at(-1),connect:async()=>({query:db.query,release(){}})};
+  const origin='http://localhost',setupToken='test-only-setup-token-not-a-production-secret';
+  const app=await createApp({db,origin,setupToken,secure:false});await new Promise(resolve=>app.listen(0,'127.0.0.1',resolve));
+  t.after(async()=>{await new Promise(resolve=>app.close(resolve));await database.close()});
+  const base=`http://127.0.0.1:${app.address().port}`;
+  async function request(path,method='GET',data,session={},extra={}){
+    const response=await fetch(base+path,{method,redirect:'manual',headers:{Origin:origin,'Content-Type':'application/json',Cookie:session.cookie||'','X-CSRF-Token':session.csrf||'',...extra},body:data===undefined?undefined:JSON.stringify(data)});
+    const content=await response.text();return {status:response.status,body:response.headers.get('content-type')?.includes('json')?JSON.parse(content):content,cookie:response.headers.get('set-cookie')?.split(';')[0],headers:response.headers};
+  }
+  assert.equal((await request('/api/records')).status,401);
+  assert.equal((await request('/')).status,303);
+  assert.equal((await request('/dashboard.js')).status,303);
+  assert.equal((await request('/api/setup','POST',{username:'owner',password:'Owner-test-password-42',token:'wrong'})).status,403);
+  const setup=await request('/api/setup','POST',{username:'owner',password:'Owner-test-password-42',token:setupToken});assert.equal(setup.status,201);
+  const owner={cookie:setup.cookie};owner.csrf=(await request('/api/session','GET',undefined,owner)).body.csrf;
+  assert.equal((await request('/api/setup','POST',{username:'second-owner',password:'Owner-test-password-42',token:setupToken})).status,409);
+  assert.equal((await request('/','GET',undefined,owner)).status,200);
+  assert.equal((await request('/api/login','POST',{username:'owner',password:'wrong'})).status,401);
+  assert.equal((await request('/api/users','POST',{username:'staff'},owner,{Origin:'https://attacker.example'})).status,403);
+  assert.equal((await request('/api/users','POST',{username:'staff'},owner,{'X-CSRF-Token':''})).status,403);
+  const invite=await request('/api/users','POST',{username:'staff'},owner);assert.equal(invite.status,201);
+  const activation=await request('/api/activate','POST',{token:invite.body.url.split('#')[1],password:'Staff-test-password-42'});assert.equal(activation.status,200);
+  const staff={cookie:activation.cookie};staff.csrf=(await request('/api/session','GET',undefined,staff)).body.csrf;
+  assert.equal((await request('/api/activate','POST',{token:invite.body.url.split('#')[1],password:'Staff-test-password-42'})).status,400);
+  assert.equal((await request('/api/users','GET',undefined,staff)).status,403);
+  assert.equal((await request('/accounts','GET',undefined,staff)).status,403);
+  assert.equal((await request('/api/import','POST',{records:{}},staff)).status,403);
+  const record={upi:1000,water:45.25,customExpenses:[{name:'Cleaning',amount:100.50}]};
+  const first=await request('/api/records/2028-02-29','PUT',{record,revision:0},staff);assert.equal(first.status,200);assert.equal(first.body.revision,1);
+  const shared=(await request('/api/records','GET',undefined,owner)).body.records;assert.equal(shared['2028-02-29'].water,45.25);assert.equal(shared['2028-02-29'].customExpenses[0].amount,100.50);
+  assert.equal((await request('/api/records/2028-02-29','PUT',{record:{...record,upi:2000},revision:0},owner)).status,409);
+  assert.equal((await request('/api/records/2028-02-29','PUT',{record:{...record,upi:2000},revision:1},owner)).status,200);
+  assert.equal((await request('/api/records/2028-02-29','PUT',{record,revision:1},staff)).status,409);
+  assert.equal((await request('/api/records/2027-02-29','PUT',{record,revision:0},staff)).status,400);
+  assert.equal((await request('/api/records/2027-02-28','PUT',{record:{upi:-1},revision:0},staff)).status,400);
+  const imported=await request('/api/import','POST',{records:{'2028-02-29':record,'2026-10-01':{upi:10}}},owner);assert.deepEqual(imported.body,{imported:1,skipped:1});
+  assert.equal((await request('/api/records','GET',undefined,staff)).body.records['2028-02-29'].upi,2000);
+  const dom=new JSDOM(await readFile(new URL('../shared.html',import.meta.url),'utf8'),{url:origin,runScripts:'outside-only'});
+  t.after(()=>dom.window.close());
+  dom.window.fetch=(path,options={})=>fetch(base+path,{...options,headers:{...options.headers,Origin:origin,Cookie:owner.cookie}});
+  const alerts=[];dom.window.alert=message=>alerts.push(message);dom.window.confirm=()=>true;
+  dom.window.eval(await readFile(new URL('../dashboard.js',import.meta.url),'utf8'));
+  const waitFor=async predicate=>{for(let i=0;i<100;i++){if(await predicate())return;await new Promise(resolve=>setTimeout(resolve,30))}throw Error('UI state did not complete')};
+  const el=id=>dom.window.document.getElementById(id);
+  await waitFor(()=>!el('sharedApp').hidden);
+  el('date').value='2029-03-15';el('date').dispatchEvent(new dom.window.Event('change',{bubbles:true}));
+  for(const [key,value] of [['upi','900'],['water','20.25']]){el(key).value=value;el(key).dispatchEvent(new dom.window.Event('input',{bubbles:true}));}
+  el('addCustomExpense').click();const custom=el('customExpenses').firstElementChild;
+  custom.querySelector('[data-custom="name"]').value='Soap';custom.querySelector('[data-custom="amount"]').value='10.50';custom.dispatchEvent(new dom.window.Event('input',{bubbles:true}));
+  el('saveBtn').click();await waitFor(()=>el('syncMessage').textContent==='Saved for everyone');assert.deepEqual(alerts,[]);
+  const uiRecord=(await request('/api/records','GET',undefined,staff)).body.records['2029-03-15'];assert.equal(uiRecord.water,20.25);assert.equal(uiRecord.customExpenses[0].name,'Soap');assert.equal(uiRecord.customExpenses[0].amount,10.5);
+  el('monthPicker').value='2028-02';el('monthPicker').dispatchEvent(new dom.window.Event('change'));
+  assert.equal(el('ledgerBody').children.length,29);assert.equal(el('monthBadge').textContent,'February 2028');
+  const ledgerInput=el('ledgerBody').querySelector('[data-date="2028-02-29"][data-key="water"]');ledgerInput.value='60';ledgerInput.dispatchEvent(new dom.window.Event('input',{bubbles:true}));
+  await waitFor(async()=>((await request('/api/records','GET',undefined,staff)).body.records['2028-02-29'].water===60));
+  const userList=(await request('/api/users','GET',undefined,owner)).body.users;const staffId=userList.find(u=>u.username==='staff').id;
+  assert(!JSON.stringify(userList).includes('password_hash'));
+  assert.equal((await request(`/api/users/${staffId}`,'POST',{action:'disable'},owner)).status,200);
+  assert.equal((await request('/api/records','GET',undefined,staff)).status,401);
+  assert.equal((await request('/api/login','POST',{username:'staff',password:'Staff-test-password-42'})).status,401);
+  const stored=(await db.query('SELECT password_hash FROM hotel_users WHERE username=$1',['owner'])).rows[0].password_hash;assert(!stored.includes('Owner-test-password'));
+  await request('/api/logout','POST',{},owner);assert.equal((await request('/api/records','GET',undefined,owner)).status,401);
+  for(let i=0;i<11;i++){const response=await request('/api/login','POST',{username:'unknown',password:'wrong'});if(i===10)assert.equal(response.status,429);}
+});
+
+test('record validation covers leap dates, numeric values and custom fields',()=>{
+  assert(validDate('2028-02-29'));assert(!validDate('2027-02-29'));assert(!validDate('2026-13-01'));
+  assert.throws(()=>cleanRecord('2026-10-02',{water:Infinity}));assert.throws(()=>cleanRecord('2026-10-02',{water:1.001}));
+  assert.throws(()=>cleanRecord('2026-10-02',{customExpenses:[{name:'',amount:1}]}));
+  assert.equal(cleanRecord('2026-10-02',{water:1.25}).water,1.25);
+});
