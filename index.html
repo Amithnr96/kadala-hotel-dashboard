@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#7c2d12">
+<title>Kadala Hotel Dashboard</title>
+<style>
+:root{--bg:#f6f2ed;--card:#fff;--ink:#2c211a;--muted:#7b6d63;--line:#e7ddd4;--brand:#7c2d12;--brand2:#d65a1f;--soft:#fff0e5;--green:#157347;--red:#b42318;--amber:#9a6700;--shadow:0 8px 24px rgba(70,45,28,.08)}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+button,input,textarea,select{font:inherit}button{cursor:pointer}
+.app{max-width:1440px;margin:auto;padding:14px 12px 90px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
+h1{margin:0;font-size:22px}.sub{font-size:12px;color:var(--muted);margin-top:3px}.badge{background:var(--soft);color:var(--brand);padding:8px 10px;border-radius:999px;font-weight:800;font-size:12px;white-space:nowrap}
+.tabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;background:#fff;border:1px solid var(--line);padding:5px;border-radius:14px;box-shadow:var(--shadow);margin-bottom:14px}
+.tabs button{border:0;background:transparent;padding:11px 6px;border-radius:9px;font-weight:900;color:var(--muted)}.tabs button.active{background:var(--brand);color:#fff}
+.page{display:none}.page.active{display:block}
+.grid{display:grid;gap:10px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:13px;box-shadow:var(--shadow)}
+.metric small{display:block;color:var(--muted);font-weight:800;font-size:11px}.metric strong{display:block;font-size:22px;margin-top:5px}.metric .note{font-size:10px;color:var(--muted);margin-top:4px}.green{color:var(--green)!important}.red{color:var(--red)!important}.amber{color:var(--amber)!important}
+.section{display:flex;justify-content:space-between;align-items:end;gap:10px;margin:17px 2px 8px}.section h2{font-size:17px;margin:0}.section span{font-size:11px;color:var(--muted)}
+.toolbar{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}.toolbar button{border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 10px;font-size:11px;font-weight:900}.toolbar .danger{color:var(--red)}.status{margin-left:auto;color:var(--green);font-size:11px;font-weight:900;display:flex;align-items:center}
+.breakdown{display:grid;gap:8px}.barrow{display:grid;grid-template-columns:110px 1fr 82px;gap:8px;align-items:center;font-size:11px}.track{height:9px;background:#f1e6dd;border-radius:99px;overflow:hidden}.bar{height:100%;background:linear-gradient(90deg,var(--brand),var(--brand2));border-radius:99px}.right{text-align:right;font-weight:900}
+.records{display:grid;gap:7px}.record{display:grid;grid-template-columns:76px 1fr auto;gap:8px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:11px;padding:9px}.record .date{font-weight:900;font-size:12px}.record .date small{display:block;color:var(--muted);font-size:10px}.record .info b{display:block}.record .info span{font-size:10px;color:var(--muted)}.record .profit{font-weight:900;text-align:right;font-size:12px}
+.empty{text-align:center;color:var(--muted);padding:22px;font-size:12px}
+.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:14px;background:#fff;box-shadow:var(--shadow);max-height:72vh}
+table{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%}th,td{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:6px;white-space:nowrap}
+th{position:sticky;top:0;z-index:5;background:#4a2c21;color:#fff;font-size:10px;text-align:center}th.group{background:#6d3d28}th.meat{background:#7a4a2c}
+td{background:#fff;font-size:11px}.sticky{position:sticky;left:0;z-index:4;background:#fff8f3!important;min-width:92px}th.sticky{z-index:7;background:#4a2c21!important}.datecell{font-weight:900}.datecell small{display:block;font-size:9px;color:var(--muted);margin-top:2px}
+.cell{width:88px;border:1px solid #ded3ca;border-radius:7px;padding:7px 6px;text-align:right;background:#fff;outline:none;color:var(--ink)}.cell:focus{border-color:var(--brand2);box-shadow:0 0 0 2px rgba(214,90,31,.12)}.noteinput{width:150px;text-align:left}.calc{font-weight:900;text-align:right;min-width:86px;background:#fcfaf8}.meatcell{background:#fffaf5}.profit.pos{color:var(--green)}.profit.neg{color:var(--red)}
+.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.span2{grid-column:span 2}label{display:block;font-size:11px;font-weight:800;color:var(--muted);margin-bottom:4px}
+input,textarea,select{width:100%;border:1px solid var(--line);background:#fff;border-radius:9px;padding:10px;color:var(--ink);outline:none}input:focus,textarea:focus,select:focus{border-color:var(--brand2);box-shadow:0 0 0 3px rgba(214,90,31,.11)}
+.groupTitle{font-weight:900;color:var(--brand);margin:14px 0 7px}.meatbox{background:#fffaf6;border:1px solid #f0dfd3;border-radius:11px;padding:9px}
+.totals{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:11px}.mini{background:#fffaf6;border:1px solid var(--line);border-radius:10px;padding:9px;text-align:center}.mini small{display:block;color:var(--muted);font-size:10px}.mini b{display:block;margin-top:4px}
+.actions{display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-top:11px}.primary,.secondary{padding:12px;border-radius:10px;font-weight:900}.primary{border:0;background:var(--brand);color:#fff}.secondary{border:1px solid var(--line);background:#fff}.helper{font-size:10px;color:var(--muted);text-align:center;margin-top:10px}
+.splitbar{height:12px;background:#efe5dd;border-radius:999px;overflow:hidden;display:flex;margin-top:10px}.splitupi{background:var(--brand)}.splitcash{background:var(--brand2)}.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:8px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}.dot.upi{background:var(--brand)}.dot.cash{background:var(--brand2)}
+@media(min-width:800px){.metrics{grid-template-columns:repeat(4,1fr)}.dashgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.formgrid{grid-template-columns:repeat(4,1fr)}.span2{grid-column:span 2}.span4{grid-column:span 4}}
+</style>
+</head>
+<body>
+<div class="app">
+<div class="top"><div><h1>Kadala Hotel Dashboard</h1><div class="sub">Daily billing, expenses and profit</div></div><div class="badge">October 2026</div></div>
+<div class="tabs"><button class="tab active" data-page="dashboard">Dashboard</button><button class="tab" data-page="entry">Daily Entry</button><button class="tab" data-page="ledger">Editable Ledger</button></div>
+
+<section id="dashboard" class="page active">
+<div class="grid metrics">
+<div class="card metric"><small>Total Billing</small><strong id="mBilling">₹0</strong><div class="note">UPI + Cash / Delivery</div></div>
+<div class="card metric"><small>UPI Billing</small><strong id="mUpi">₹0</strong><div class="note" id="upiShare">0% of billing</div></div>
+<div class="card metric"><small>Cash / Delivery</small><strong id="mCash">₹0</strong><div class="note" id="cashShare">0% of billing</div></div>
+<div class="card metric"><small>Total Expenses</small><strong id="mExpense" class="red">₹0</strong><div class="note">All expenses</div></div>
+<div class="card metric"><small>Net Profit</small><strong id="mProfit" class="green">₹0</strong><div class="note">Billing − expenses</div></div>
+<div class="card metric"><small>Profit Margin</small><strong id="mMargin">0%</strong><div class="note">Profit ÷ billing</div></div>
+<div class="card metric"><small>Meat Spend</small><strong id="mMeat">₹0</strong><div class="note">Egg + Fish + Chicken</div></div>
+<div class="card metric"><small>Average Daily Billing</small><strong id="mAvg">₹0</strong><div class="note" id="daysEntered">0 days entered</div></div>
+</div>
+<div class="dashgrid">
+<div>
+<div class="section"><h2>Billing Split</h2><span>October</span></div>
+<div class="card"><div id="splitLabel"><b>No billing entered yet</b></div><div class="splitbar"><div id="upiBar" class="splitupi" style="width:0%"></div><div id="cashBar" class="splitcash" style="width:0%"></div></div><div class="legend"><span><i class="dot upi"></i>UPI <b id="legendUpi">₹0</b></span><span><i class="dot cash"></i>Cash / Delivery <b id="legendCash">₹0</b></span></div></div>
+<div class="section"><h2>Expense Breakdown</h2><span>by category</span></div><div class="card"><div id="breakdown" class="breakdown"></div></div>
+</div>
+<div><div class="section"><h2>Daily Performance</h2><span>latest first</span></div><div class="card"><div id="dailyPerformance" class="records"></div></div></div>
+</div>
+</section>
+
+<section id="entry" class="page">
+<div class="card">
+<div class="section"><h2>Daily Entry</h2><span id="editLabel">New record</span></div>
+<div class="formgrid"><div class="span2"><label>Date</label><input id="date" type="date" min="2026-10-01" max="2026-10-31"></div></div>
+<div class="groupTitle">Billing</div><div class="formgrid"><div><label>UPI Billing</label><input id="upi" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></div><div><label>Cash / Delivery</label><input id="cash" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></div></div>
+<div class="groupTitle">Expenses</div><div class="formgrid"><div><label>Daily Staff Salary</label><input id="staff" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></div><div><label>Rent</label><input id="rent" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></div></div>
+<div class="groupTitle">Meat Ingredients</div><div class="meatbox"><div class="formgrid"><div><label>Egg</label><input id="egg" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></div><div><label>Fish</label><input id="fish" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></div><div><label>Chicken</label><input id="chicken" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></div><div><label>Meat Total</label><input id="meat" type="text" value="₹0" readonly></div></div></div>
+<div class="groupTitle">Other Expenses</div><div class="formgrid">
+<div><label>Gas</label><input id="gas" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></div><div><label>Vegetables</label><input id="vegetables" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></div><div><label>Cool Drinks</label><input id="cooldrinks" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></div><div><label>Chapati</label><input id="chapati" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></div><div><label>Dairy</label><input id="dairy" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></div><div><label>Miscellaneous</label><input id="misc" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></div><div><label>Extra</label><input id="extra" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></div><div><label>Leaf Meal Plates</label><input id="leaf" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></div><div class="span2"><label>Notes</label><textarea id="notes" rows="2" placeholder="Optional"></textarea></div>
+</div>
+<div class="totals"><div class="mini"><small>Total Billing</small><b id="liveBilling">₹0</b></div><div class="mini"><small>Total Expenses</small><b id="liveExpense">₹0</b></div><div class="mini"><small>Net Profit</small><b id="liveProfit">₹0</b></div></div>
+<div class="actions"><button id="saveBtn" class="primary">Save / Update Day</button><button id="clearFormBtn" class="secondary">Clear</button></div>
+<div class="helper">Saving the same date updates that day's record.</div>
+</div>
+</section>
+
+<section id="ledger" class="page">
+<div class="toolbar"><button id="exportBtn">Export CSV</button><button id="backupBtn">Backup JSON</button><button id="restoreBtn">Restore JSON</button><button id="clearMonthBtn" class="danger">Clear October</button><input id="restoreFile" type="file" accept=".json" hidden><div class="status" id="saveStatus">Saved</div></div>
+<div class="tablewrap">
+<table><thead><tr><th rowspan="2" class="sticky">Date</th><th colspan="3" class="group">Billing</th><th colspan="6" class="meat">Core Expenses</th><th colspan="8" class="group">Other Expenses</th><th colspan="3" class="group">Totals</th><th rowspan="2">Notes</th></tr>
+<tr><th>UPI</th><th>Cash / Delivery</th><th>Total Billing</th><th>Staff Salary</th><th>Rent</th><th>Egg</th><th>Fish</th><th>Chicken</th><th>Meat Total</th><th>Gas</th><th>Vegetables</th><th>Cool Drinks</th><th>Chapati</th><th>Dairy</th><th>Miscellaneous</th><th>Extra</th><th>Leaf Meal Plates</th><th>Total Expenses</th><th>Net Profit</th><th>Margin</th></tr></thead><tbody id="ledgerBody"></tbody></table>
+</div><div class="helper">All October 1–31 cells are directly editable. Changes auto-save as you type.</div>
+</section>
+</div>
+
+<script>
+(function(){
+"use strict";
+var KEY="kadala_hotel_oct_2026_live_v2";
+var EXP=[["staff","Staff Salary"],["rent","Rent"],["egg","Egg"],["fish","Fish"],["chicken","Chicken"],["gas","Gas"],["vegetables","Vegetables"],["cooldrinks","Cool Drinks"],["chapati","Chapati"],["dairy","Dairy"],["misc","Miscellaneous"],["extra","Extra"],["leaf","Leaf Meal Plates"]];
+var FIELDS=["upi","cash"].concat(EXP.map(function(x){return x[0];})).concat(["notes"]);
+var state=load();var saveTimer=null;
+function e(id){return document.getElementById(id)}function n(v){v=Number(v||0);return isFinite(v)?v:0}function money(v){try{return new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:0}).format(n(v))}catch(err){return "₹"+Math.round(n(v))}}function percent(v){return (Math.round(v*10)/10).toFixed(1).replace(".0","")+"%"}
+function dates(){var a=[];for(var d=1;d<=31;d++)a.push("2026-10-"+String(d).padStart(2,"0"));return a}
+function record(d){return {date:d,upi:0,cash:0,staff:0,rent:0,egg:0,fish:0,chicken:0,gas:0,vegetables:0,cooldrinks:0,chapati:0,dairy:0,misc:0,extra:0,leaf:0,notes:""}}
+function ensure(x){dates().forEach(function(d){if(!x[d])x[d]=record(d)});return x}
+function load(){try{return ensure(JSON.parse(localStorage.getItem(KEY)||"{}"))}catch(err){return ensure({})}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state));e("saveStatus").textContent="Saved";e("saveStatus").className="status"}catch(err){e("saveStatus").textContent="Save blocked";e("saveStatus").className="status red"}}
+function queue(){e("saveStatus").textContent="Saving…";clearTimeout(saveTimer);saveTimer=setTimeout(save,220)}
+function bill(r){return n(r.upi)+n(r.cash)}function meatTotal(r){return n(r.egg)+n(r.fish)+n(r.chicken)}function expense(r){var t=0;EXP.forEach(function(x){t+=n(r[x[0]])});return t}function prof(r){return bill(r)-expense(r)}function margin(r){var b=bill(r);return b?prof(r)/b*100:0}
+function has(r){if(String(r.notes||"").trim())return true;return FIELDS.filter(function(k){return k!="notes"}).some(function(k){return n(r[k])!==0})}
+function dObj(s){var p=s.split("-");return new Date(Number(p[0]),Number(p[1])-1,Number(p[2]))}function dLabel(s){return dObj(s).toLocaleDateString("en-IN",{day:"2-digit",month:"short"})}function dow(s){return dObj(s).toLocaleDateString("en-IN",{weekday:"short"})}
+function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
+function show(name){document.querySelectorAll(".page").forEach(function(p){p.classList.remove("active")});document.querySelectorAll(".tab").forEach(function(b){b.classList.remove("active")});e(name).classList.add("active");document.querySelector('.tab[data-page="'+name+'"]').classList.add("active");if(name==="dashboard")renderDashboard()}
+function input(date,key,cls){var r=state[date],val=key==="notes"?(r[key]||""):(n(r[key])||"");if(key==="notes")return '<input class="cell noteinput '+(cls||"")+'" data-date="'+date+'" data-key="'+key+'" type="text" value="'+esc(val)+'" placeholder="Optional">';return '<input class="cell '+(cls||"")+'" data-date="'+date+'" data-key="'+key+'" type="number" min="0" step="0.01" inputmode="decimal" value="'+val+'" placeholder="0">'}
+function renderLedger(){var h="";dates().forEach(function(d){var r=state[d],p=prof(r);h+='<tr data-row="'+d+'"><td class="sticky datecell">'+dLabel(d)+'<small>'+dow(d)+'</small></td><td>'+input(d,"upi")+'</td><td>'+input(d,"cash")+'</td><td class="calc" data-calc="'+d+'-bill">'+money(bill(r))+'</td><td>'+input(d,"staff")+'</td><td>'+input(d,"rent")+'</td><td class="meatcell">'+input(d,"egg")+'</td><td class="meatcell">'+input(d,"fish")+'</td><td class="meatcell">'+input(d,"chicken")+'</td><td class="calc meatcell" data-calc="'+d+'-meat">'+money(meatTotal(r))+'</td><td>'+input(d,"gas")+'</td><td>'+input(d,"vegetables")+'</td><td>'+input(d,"cooldrinks")+'</td><td>'+input(d,"chapati")+'</td><td>'+input(d,"dairy")+'</td><td>'+input(d,"misc")+'</td><td>'+input(d,"extra")+'</td><td>'+input(d,"leaf")+'</td><td class="calc" data-calc="'+d+'-exp">'+money(expense(r))+'</td><td class="calc profit '+(p>=0?"pos":"neg")+'" data-calc="'+d+'-profit">'+money(p)+'</td><td class="calc" data-calc="'+d+'-margin">'+percent(margin(r))+'</td><td>'+input(d,"notes")+'</td></tr>'});e("ledgerBody").innerHTML=h;document.querySelectorAll("[data-date][data-key]").forEach(function(el){el.addEventListener("input",function(){var d=this.getAttribute("data-date"),k=this.getAttribute("data-key");state[d][k]=k==="notes"?this.value:n(this.value);updateRow(d);renderDashboard();queue()})})}
+function setCalc(d,k,text,cls){var el=document.querySelector('[data-calc="'+d+'-'+k+'"]');if(el){el.textContent=text;if(cls)el.className=cls}}
+function updateRow(d){var r=state[d],p=prof(r);setCalc(d,"bill",money(bill(r)));setCalc(d,"meat",money(meatTotal(r)));setCalc(d,"exp",money(expense(r)));setCalc(d,"profit",money(p),"calc profit "+(p>=0?"pos":"neg"));setCalc(d,"margin",percent(margin(r)))}
+function totals(){var t={upi:0,cash:0,expense:0,profit:0,meat:0,days:0,cats:{}};EXP.forEach(function(x){t.cats[x[0]]=0});dates().forEach(function(d){var r=state[d];t.upi+=n(r.upi);t.cash+=n(r.cash);t.expense+=expense(r);t.profit+=prof(r);t.meat+=meatTotal(r);EXP.forEach(function(x){t.cats[x[0]]+=n(r[x[0]])});if(has(r))t.days++});return t}
+function renderDashboard(){var t=totals(),total=t.upi+t.cash,m=total?t.profit/total*100:0,avg=t.days?total/t.days:0,us=total?t.upi/total*100:0,cs=total?t.cash/total*100:0;e("mBilling").textContent=money(total);e("mUpi").textContent=money(t.upi);e("mCash").textContent=money(t.cash);e("mExpense").textContent=money(t.expense);e("mProfit").textContent=money(t.profit);e("mProfit").className=t.profit>=0?"green":"red";e("mMargin").textContent=percent(m);e("mMargin").className=m>=0?"green":"red";e("mMeat").textContent=money(t.meat);e("mAvg").textContent=money(avg);e("daysEntered").textContent=t.days+" day"+(t.days===1?"":"s")+" entered";e("upiShare").textContent=percent(us)+" of billing";e("cashShare").textContent=percent(cs)+" of billing";e("upiBar").style.width=us+"%";e("cashBar").style.width=cs+"%";e("legendUpi").textContent=money(t.upi);e("legendCash").textContent=money(t.cash);e("splitLabel").innerHTML=total?"<b>UPI "+percent(us)+" • Cash / Delivery "+percent(cs)+"</b>":"<b>No billing entered yet</b>";
+var mx=Math.max.apply(null,[1].concat(Object.keys(t.cats).map(function(k){return t.cats[k]})));e("breakdown").innerHTML=EXP.map(function(x){var v=t.cats[x[0]];return '<div class="barrow"><div>'+x[1]+'</div><div class="track"><div class="bar" style="width:'+((v/mx)*100)+'%"></div></div><div class="right">'+money(v)+'</div></div>'}).join("");
+var rows=dates().filter(function(d){return has(state[d])}).sort().reverse();e("dailyPerformance").innerHTML=rows.length?rows.map(function(d){var r=state[d],p=prof(r);return '<div class="record"><div class="date">'+dLabel(d)+'<small>'+dow(d)+'</small></div><div class="info"><b>'+money(bill(r))+'</b><span>Expenses '+money(expense(r))+'</span></div><div class="profit '+(p>=0?"green":"red")+'">'+money(p)+'</div></div>'}).join(""):'<div class="empty">Enter values in Daily Entry or Editable Ledger.</div>'}
+function live(){var b=n(e("upi").value)+n(e("cash").value),ex=0;EXP.forEach(function(x){ex+=n(e(x[0]).value)});var mt=n(e("egg").value)+n(e("fish").value)+n(e("chicken").value),p=b-ex;e("meat").value=money(mt);e("liveBilling").textContent=money(b);e("liveExpense").textContent=money(ex);e("liveProfit").textContent=money(p);e("liveProfit").className=p>=0?"green":"red"}
+function clearForm(keep){var d=e("date").value;["upi","cash"].concat(EXP.map(function(x){return x[0]})).forEach(function(k){e(k).value=""});e("notes").value="";e("date").value=keep?(d||"2026-10-01"):"2026-10-01";e("editLabel").textContent="New record";live()}
+function loadForm(d){clearForm(false);e("date").value=d;var r=state[d];if(r){["upi","cash"].concat(EXP.map(function(x){return x[0]})).forEach(function(k){e(k).value=n(r[k])||""});e("notes").value=r.notes||"";e("editLabel").textContent="Editing "+dLabel(d)}live()}
+function saveForm(){var d=e("date").value;if(!d||d<"2026-10-01"||d>"2026-10-31"){alert("Choose a date from 1–31 October 2026.");return}var r=state[d]||record(d);r.date=d;r.upi=n(e("upi").value);r.cash=n(e("cash").value);EXP.forEach(function(x){r[x[0]]=n(e(x[0]).value)});r.notes=e("notes").value||"";state[d]=r;save();renderLedger();renderDashboard();show("dashboard")}
+function download(content,name,type){var a=document.createElement("a"),u=URL.createObjectURL(new Blob([content],{type:type}));a.href=u;a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(u);a.remove()},150)}
+function exportCsv(){var h=["Date","UPI","Cash / Delivery","Total Billing"].concat(EXP.map(function(x){return x[1]})).concat(["Meat Total","Total Expenses","Net Profit","Margin %","Notes"]),lines=[h.join(",")];dates().forEach(function(d){var r=state[d],v=[d,r.upi||0,r.cash||0,bill(r)].concat(EXP.map(function(x){return r[x[0]]||0})).concat([meatTotal(r),expense(r),prof(r),margin(r),'"'+String(r.notes||"").replace(/"/g,'""')+'"']);lines.push(v.join(","))});download(lines.join("\n"),"Kadala_October_2026.csv","text/csv")}
+function restore(file){var rd=new FileReader();rd.onload=function(){try{var x=JSON.parse(rd.result);state=ensure(x&&typeof x==="object"?x:{});save();renderLedger();renderDashboard();alert("Backup restored.")}catch(err){alert("Invalid backup file.")}};rd.readAsText(file)}
+document.querySelectorAll(".tab").forEach(function(b){b.addEventListener("click",function(){show(this.getAttribute("data-page"))})});["upi","cash"].concat(EXP.map(function(x){return x[0]})).forEach(function(k){e(k).addEventListener("input",live)});e("date").addEventListener("change",function(){loadForm(this.value||"2026-10-01")});e("saveBtn").addEventListener("click",saveForm);e("clearFormBtn").addEventListener("click",function(){clearForm(true)});e("exportBtn").addEventListener("click",exportCsv);e("backupBtn").addEventListener("click",function(){download(JSON.stringify(state,null,2),"Kadala_October_2026_Backup.json","application/json")});e("restoreBtn").addEventListener("click",function(){e("restoreFile").click()});e("restoreFile").addEventListener("change",function(){if(this.files&&this.files[0])restore(this.files[0])});e("clearMonthBtn").addEventListener("click",function(){if(confirm("Clear all October data?")){state=ensure({});save();renderLedger();renderDashboard();clearForm(false)}});e("date").value="2026-10-01";renderLedger();renderDashboard();live();save()
+})();
+</script>
+</body>
+</html>
