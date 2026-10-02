@@ -69,7 +69,23 @@ export async function initialize(db) {
       updated_by text REFERENCES hotel_users(id), updated_at timestamptz NOT NULL DEFAULT now()
     );
     CREATE TABLE IF NOT EXISTS hotel_rate_limits (key text PRIMARY KEY, attempts integer NOT NULL, expires_at timestamptz NOT NULL);
+    ALTER TABLE hotel_users DROP CONSTRAINT IF EXISTS hotel_users_role_check;
+    ALTER TABLE hotel_users ADD CONSTRAINT hotel_users_role_check CHECK(role IN ('owner','staff','inventory'));
+    CREATE TABLE IF NOT EXISTS hotel_inventory (
+      day text PRIMARY KEY, data jsonb NOT NULL, revision integer NOT NULL DEFAULT 1,
+      updated_by text REFERENCES hotel_users(id), updated_at timestamptz NOT NULL DEFAULT now()
+    );
   `);
+}
+
+export function cleanInventory(day, input) {
+  if (!validDate(day) || !input || typeof input!=='object' || !Array.isArray(input.meat) || !Array.isArray(input.custom) || input.meat.length!==3 || input.custom.length>100) throw problem(400,'Invalid inventory record.');
+  const quantity=value=>{if(value===null||value==='')return null;if(typeof value!=='number'||!Number.isFinite(value)||value<0||value>1000000000||Math.abs(value*1000-Math.round(value*1000))>0.0001)throw problem(400,'Stock must be a non-negative number with up to three decimal places.');return value;};
+  const item=row=>{if(!row||typeof row.name!=='string'||!row.name.trim()||row.name.trim().length>100||!['kg','g','litres','ml','pieces'].includes(row.unit))throw problem(400,'Enter an item name and a valid unit.');return {name:row.name.trim(),unit:row.unit,opening:quantity(row.opening),closing:quantity(row.closing)};};
+  const meat=input.meat.map(item), custom=input.custom.map(item);
+  if(meat.map(row=>row.name).join(',')!=='Chicken,Fish,Egg')throw problem(400,'Meat items must be Chicken, Fish and Egg.');
+  if(new Set(custom.map(row=>row.name.toLowerCase())).size!==custom.length)throw problem(400,'Use a different name for each custom item.');
+  return {date:day,meat,custom};
 }
 
 export async function createApp({ db, origin, setupToken, secure = true }) {
@@ -157,7 +173,20 @@ export async function createApp({ db, origin, setupToken, secure = true }) {
         throw problem(401,'Please sign in.');
       }
       if (!['GET','HEAD'].includes(req.method) && !equal(req.headers['x-csrf-token']||'',user.csrf)) throw problem(403,'Session verification failed. Reload and try again.');
-      if (req.method==='GET' && path==='/') return file(res,'shared.html','text/html; charset=utf-8');
+      if (user.role==='inventory' && !['/','/inventory','/inventory.js','/api/session','/api/logout','/api/password'].includes(path) && !/^\/api\/inventory\/[^/]+$/.test(path)) throw problem(403,'This account has access to inventory only.');
+      if (req.method==='GET' && path==='/') return file(res,user.role==='inventory'?'inventory.html':'shared.html','text/html; charset=utf-8');
+      if (req.method==='GET' && path==='/inventory') return file(res,'inventory.html','text/html; charset=utf-8');
+      if (req.method==='GET' && path==='/inventory.js') return file(res,'inventory.js','application/javascript; charset=utf-8');
+      if (path.startsWith('/api/inventory/')) {
+        const day=path.slice('/api/inventory/'.length);if(!validDate(day))throw problem(400,'Choose a valid inventory date.');
+        if(req.method==='GET'){const row=(await db.query('SELECT data,revision FROM hotel_inventory WHERE day=$1',[day])).rows[0];return json(res,200,row?{record:row.data,revision:row.revision}:{record:null,revision:0});}
+        if(req.method==='PUT'){
+          const data=await body(req), record=cleanInventory(day,data.record);if(!Number.isSafeInteger(data.revision)||data.revision<0)throw problem(400,'Invalid inventory revision.');
+          const result=data.revision===0?await db.query('INSERT INTO hotel_inventory(day,data,updated_by) VALUES($1,$2,$3) ON CONFLICT(day) DO NOTHING RETURNING revision',[day,JSON.stringify(record),user.id]):await db.query('UPDATE hotel_inventory SET data=$1,revision=revision+1,updated_by=$2,updated_at=now() WHERE day=$3 AND revision=$4 RETURNING revision',[JSON.stringify(record),user.id,day,data.revision]);
+          if(!result.rows.length)throw problem(409,'Someone else updated this inventory date. Download your unsaved copy, then reload before editing again.');
+          return json(res,200,{revision:result.rows[0].revision});
+        }
+      }
       if (req.method==='GET' && path==='/dashboard.js') return file(res,'dashboard.js','application/javascript; charset=utf-8');
       if (req.method==='GET' && path==='/accounts') {owner(user);return file(res,'accounts.html','text/html; charset=utf-8');}
       if (req.method==='GET' && path==='/accounts.js') {owner(user);return file(res,'accounts.js','application/javascript; charset=utf-8');}
@@ -195,18 +224,21 @@ export async function createApp({ db, origin, setupToken, secure = true }) {
       if (path==='/api/users' && req.method==='GET') {owner(user);return json(res,200,{users:(await db.query('SELECT id,username,role,active,(password_hash IS NOT NULL) AS activated FROM hotel_users ORDER BY created_at')).rows});}
       if (path==='/api/users' && req.method==='POST') {
         owner(user);const data=await body(req), name=username(data.username), invitation=token();
-        if ((await db.query("SELECT id FROM hotel_users WHERE role='staff'")).rows.length>=50) throw problem(400,'Staff account limit reached.');
-        await db.query("INSERT INTO hotel_users(id,username,role,invitation_hash,invitation_expires) VALUES($1,$2,'staff',$3,now()+interval '24 hours')",[token(),name,digest(invitation)]);
+        const role=data.role||'staff';if(!['staff','inventory'].includes(role))throw problem(400,'Choose Staff or Inventory only.');
+        if ((await db.query("SELECT id FROM hotel_users WHERE role<>'owner'")).rows.length>=50) throw problem(400,'Staff account limit reached.');
+        await db.query("INSERT INTO hotel_users(id,username,role,invitation_hash,invitation_expires) VALUES($1,$2,$3,$4,now()+interval '24 hours')",[token(),name,role,digest(invitation)]);
         return json(res,201,{url:`${origin}/activate#${invitation}`});
       }
       if (path.startsWith('/api/users/') && req.method==='POST') {
         owner(user);const id=path.slice('/api/users/'.length),data=await body(req);
-        if (!['disable','invite'].includes(data.action)) throw problem(400,'Invalid account action.');
+        if (!['disable','invite','role'].includes(data.action)) throw problem(400,'Invalid account action.');
+        if(data.action==='role'&&!['staff','inventory'].includes(data.role))throw problem(400,'Choose Staff or Inventory only.');
         const invitation=token();
         await transaction(async tx=>{
-          const result=await tx.query("SELECT id FROM hotel_users WHERE id=$1 AND role='staff' FOR UPDATE",[id]);if(!result.rows.length)throw problem(404,'Staff account not found.');
+          const result=await tx.query("SELECT id FROM hotel_users WHERE id=$1 AND role<>'owner' FOR UPDATE",[id]);if(!result.rows.length)throw problem(404,'Staff account not found.');
           await tx.query('DELETE FROM hotel_sessions WHERE user_id=$1',[id]);
-          if(data.action==='disable')await tx.query('UPDATE hotel_users SET active=false,invitation_hash=NULL,invitation_expires=NULL WHERE id=$1',[id]);
+          if(data.action==='role')await tx.query('UPDATE hotel_users SET role=$1 WHERE id=$2',[data.role,id]);
+          else if(data.action==='disable')await tx.query('UPDATE hotel_users SET active=false,invitation_hash=NULL,invitation_expires=NULL WHERE id=$1',[id]);
           else await tx.query("UPDATE hotel_users SET active=true,password_hash=NULL,invitation_hash=$1,invitation_expires=now()+interval '24 hours' WHERE id=$2",[digest(invitation),id]);
         });
         return json(res,200,data.action==='invite'?{url:`${origin}/activate#${invitation}`}:{ok:true});
