@@ -126,3 +126,22 @@ test('record validation covers leap dates, numeric values and custom fields',()=
   assert.throws(()=>cleanInventory('2026-10-02',{...stock,custom:[{name:'Rice',unit:'kg',opening:1.0001,closing:0}]}));
   assert.throws(()=>cleanInventory('2026-10-02',{...stock,custom:[{name:'Rice',unit:'invalid',opening:1,closing:0}]}));
 });
+
+test('invitation survives page refresh and submits the complete code', async t=>{
+  const html=await readFile(new URL('../auth.html',import.meta.url),'utf8');
+  const script=await readFile(new URL('../auth.js',import.meta.url),'utf8');
+  let url='https://hotel.example/activate#test-invitation-code';
+  for(let reload=0;reload<2;reload++){
+    const dom=new JSDOM(html,{url,runScripts:'outside-only'});t.after(()=>dom.window.close());
+    let submitted;
+    dom.window.fetch=async(path,options)=>{submitted={path,body:JSON.parse(options.body)};return {ok:false,json:async()=>({error:'Test response'})}};
+    dom.window.eval(script);
+    assert.equal(dom.window.location.hash,'#test-invitation-code');
+    const doc=dom.window.document;assert.equal(doc.getElementById('submit').disabled,false);
+    doc.getElementById('password').value='A-staff-password-123';doc.getElementById('confirmation').value='A-staff-password-123';
+    doc.getElementById('authForm').dispatchEvent(new dom.window.Event('submit',{cancelable:true}));
+    await new Promise(resolve=>setTimeout(resolve,0));
+    assert.equal(submitted.path,'/api/activate');assert.equal(submitted.body.token,'test-invitation-code');
+    url=dom.window.location.href;
+  }
+});
