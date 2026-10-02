@@ -86,8 +86,16 @@ test('owner and staff authentication, shared records, permissions and edit confl
   se('stockDate').value='2029-04-02';se('stockDate').dispatchEvent(new stockDom.window.Event('change'));await waitFor(()=>!se('stockDate').disabled&&se('stockDate').value==='2029-04-02');
   const meatRow=se('meatRows').firstElementChild;meatRow.querySelector('[data-field="opening"]').value='10.25';meatRow.querySelector('[data-field="closing"]').value='6';
   se('addStock').click();const customRow=se('customRows').firstElementChild;customRow.querySelector('[data-field="name"]').value='Oil';customRow.querySelector('[data-field="unit"]').value='litres';customRow.querySelector('[data-field="opening"]').value='5';customRow.querySelector('[data-field="closing"]').value='3';
+  assert.equal(se('fishRows').children.length,7);
+  se('fishRows').firstElementChild.querySelector('[data-field="opening"]').value='4.5';
+  se('addFish').click();const fishRow=se('customFishRows').firstElementChild;fishRow.querySelector('[data-field="name"]').value='Tuna';fishRow.querySelector('[data-field="opening"]').value='3';fishRow.querySelector('[data-field="closing"]').value='1.25';
   se('saveStock').click();await waitFor(()=>se('message').textContent==='Inventory saved for everyone.');
   assert.equal((await request('/api/inventory/2029-04-02','GET',undefined,owner)).body.record.custom[0].name,'Oil');
+  const savedFish=(await request('/api/inventory/2029-04-02','GET',undefined,owner)).body.record;
+  assert.equal(savedFish.fish[0].name,'Prawns Portions');assert.equal(savedFish.fish[0].opening,4.5);assert.equal(savedFish.customFish[0].closing,1.25);
+  const legacy={...savedFish};delete legacy.fish;delete legacy.customFish;
+  assert.equal((await request('/api/inventory/2029-04-02','PUT',{record:legacy,revision:1},owner)).status,200);
+  assert.equal((await request('/api/inventory/2029-04-02','GET',undefined,owner)).body.record.customFish[0].name,'Tuna');
   await initialize(db);assert.equal((await request('/api/inventory/2029-04-02','GET',undefined,stockUser)).body.record.meat[0].opening,10.25);
   const userList=(await request('/api/users','GET',undefined,owner)).body.users;const staffId=userList.find(u=>u.username==='staff').id;
   const stockId=userList.find(u=>u.username==='stockkeeper').id;
@@ -110,6 +118,10 @@ test('record validation covers leap dates, numeric values and custom fields',()=
   assert.equal(cleanRecord('2026-10-02',{water:1.25}).water,1.25);
   const stock={meat:['Chicken','Fish','Egg'].map(name=>({name,unit:'kg',opening:null,closing:0})),custom:[]};
   assert.equal(cleanInventory('2026-10-02',stock).meat[0].opening,null);
+  assert.equal(cleanInventory('2026-10-02',stock).fish.length,7);
+  assert.throws(()=>cleanInventory('2026-10-02',{...stock,fish:[]}));
+  assert.throws(()=>cleanInventory('2026-10-02',{...stock,customFish:[{name:'Crab',unit:'kg',opening:1,closing:0}]}));
+  assert.throws(()=>cleanInventory('2026-10-02',{...stock,customFish:[{name:'Tuna',unit:'kg',opening:-1,closing:0}]}));
   assert.throws(()=>cleanInventory('2026-10-02',{...stock,custom:[{name:'Rice',unit:'kg',opening:-1,closing:0}]}));
   assert.throws(()=>cleanInventory('2026-10-02',{...stock,custom:[{name:'Rice',unit:'kg',opening:1.0001,closing:0}]}));
   assert.throws(()=>cleanInventory('2026-10-02',{...stock,custom:[{name:'Rice',unit:'invalid',opening:1,closing:0}]}));

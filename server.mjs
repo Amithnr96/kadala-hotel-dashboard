@@ -85,7 +85,15 @@ export function cleanInventory(day, input) {
   const meat=input.meat.map(item), custom=input.custom.map(item);
   if(meat.map(row=>row.name).join(',')!=='Chicken,Fish,Egg')throw problem(400,'Meat items must be Chicken, Fish and Egg.');
   if(new Set(custom.map(row=>row.name.toLowerCase())).size!==custom.length)throw problem(400,'Use a different name for each custom item.');
-  return {date:day,meat,custom};
+  const fishNames=["Prawns Portions","Crab","Bhangde","Mathi","Pomfret","Anjal","Kane"];
+  const fishInput=input.fish===undefined?fishNames.map(name=>({name,unit:'kg',opening:null,closing:null})):input.fish;
+  const customFishInput=input.customFish===undefined?[]:input.customFish;
+  if(!Array.isArray(fishInput)||fishInput.length!==fishNames.length||!Array.isArray(customFishInput)||customFishInput.length>100)throw problem(400,'Invalid fish inventory.');
+  const fish=fishInput.map(item),customFish=customFishInput.map(item);
+  if(fish.some((row,i)=>row.name!==fishNames[i]))throw problem(400,'Use the listed fish varieties.');
+  const allFish=[...fish,...customFish].map(row=>row.name.toLowerCase());
+  if(new Set(allFish).size!==allFish.length)throw problem(400,'Use a different name for each custom fish.');
+  return {date:day,meat,custom,fish,customFish};
 }
 
 export async function createApp({ db, origin, setupToken, secure = true }) {
@@ -181,7 +189,12 @@ export async function createApp({ db, origin, setupToken, secure = true }) {
         const day=path.slice('/api/inventory/'.length);if(!validDate(day))throw problem(400,'Choose a valid inventory date.');
         if(req.method==='GET'){const row=(await db.query('SELECT data,revision FROM hotel_inventory WHERE day=$1',[day])).rows[0];return json(res,200,row?{record:row.data,revision:row.revision}:{record:null,revision:0});}
         if(req.method==='PUT'){
-          const data=await body(req), record=cleanInventory(day,data.record);if(!Number.isSafeInteger(data.revision)||data.revision<0)throw problem(400,'Invalid inventory revision.');
+          const data=await body(req);
+          if(data.record && (data.record.fish===undefined || data.record.customFish===undefined)) {
+            const previous=(await db.query('SELECT data FROM hotel_inventory WHERE day=$1',[day])).rows[0]?.data;
+            if(previous){if(data.record.fish===undefined)data.record.fish=previous.fish;if(data.record.customFish===undefined)data.record.customFish=previous.customFish;}
+          }
+          const record=cleanInventory(day,data.record);if(!Number.isSafeInteger(data.revision)||data.revision<0)throw problem(400,'Invalid inventory revision.');
           const result=data.revision===0?await db.query('INSERT INTO hotel_inventory(day,data,updated_by) VALUES($1,$2,$3) ON CONFLICT(day) DO NOTHING RETURNING revision',[day,JSON.stringify(record),user.id]):await db.query('UPDATE hotel_inventory SET data=$1,revision=revision+1,updated_by=$2,updated_at=now() WHERE day=$3 AND revision=$4 RETURNING revision',[JSON.stringify(record),user.id,day,data.revision]);
           if(!result.rows.length)throw problem(409,'Someone else updated this inventory date. Download your unsaved copy, then reload before editing again.');
           return json(res,200,{revision:result.rows[0].revision});
